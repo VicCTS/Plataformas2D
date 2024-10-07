@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
-using Unity.Mathematics;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -13,6 +11,11 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 10f;
 
     [SerializeField] private int healthPoints = 5;
+
+    private bool isAttacking;
+
+    [SerializeField] private Transform attackHitBox;
+    [SerializeField] private float attackRadius = 1;
 
     void Awake()
     {
@@ -28,9 +31,84 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        horizontalInput = Input.GetAxis("Horizontal");
+        Movement();
+        
+        if(Input.GetButtonDown("Jump") && GroundSensor.isGrounded && !isAttacking)
+        {
+            Jump();
+        }
+
+        if(Input.GetButtonDown("Attack") && GroundSensor.isGrounded && !isAttacking)
+        {
+            Attack();
+        }
+
+        if(Input.GetKeyDown(KeyCode.P))
+        {
+            GameManager.instance.Pause();
+        }
+    }
+
+    // Update is called once per frame
+    void FixedUpdate()
+    {
+        /*if(isAttacking)
+        {
+            characterRigidbody.velocity = new Vector2(0, characterRigidbody.velocity.y);
+        }
+        else
+        {
+            characterRigidbody.velocity = new Vector2(horizontalInput * characterSpeed, characterRigidbody.velocity.y);
+        }*/
+
+        characterRigidbody.velocity = new Vector2(horizontalInput * characterSpeed, characterRigidbody.velocity.y);
+    }
+
+    void Movement()
+    {
+
+        if(isAttacking && horizontalInput == 0)
+        {
+            horizontalInput = 0;
+        }
+        else
+        {
+            horizontalInput = Input.GetAxis("Horizontal");
+        }
 
         if(horizontalInput < 0)
+        {
+            if(!isAttacking)
+            {
+                transform.rotation = Quaternion.Euler(0, 180, 0);
+            }
+            
+            characterAnimator.SetBool("IsRunning", true);
+        }
+        else if(horizontalInput > 0)
+        {
+            if(!isAttacking)
+            {
+                transform.rotation = Quaternion.Euler(0, 0, 0);
+            }
+            
+            characterAnimator.SetBool("IsRunning", true);
+        }
+        else
+        {
+            characterAnimator.SetBool("IsRunning", false);
+        }
+
+        /*if(isAttacking)
+        {
+            return;
+        }
+
+        if(horizontalInput == 0)
+        {
+            characterAnimator.SetBool("IsRunning", false);
+        }
+        else if(horizontalInput < 0)
         {
             transform.rotation = Quaternion.Euler(0, 180, 0);
             characterAnimator.SetBool("IsRunning", true);
@@ -39,47 +117,74 @@ public class PlayerController : MonoBehaviour
         {
             transform.rotation = Quaternion.Euler(0, 0, 0);
             characterAnimator.SetBool("IsRunning", true);
+        }*/
+    }
+
+    void Jump()
+    {
+        characterRigidbody.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+        characterAnimator.SetBool("IsJumping", true);
+    }
+
+    void Attack()
+    {
+        StartCoroutine(AttackAnimation());
+        characterAnimator.SetTrigger("Attack");         
+    }
+
+    IEnumerator AttackAnimation()
+    {
+        isAttacking = true;
+
+        yield return new WaitForSeconds(0.1f);
+
+        Collider2D[] collider = Physics2D.OverlapCircleAll(attackHitBox.position, attackRadius);
+        foreach(Collider2D enemy in collider)
+        {
+            if(enemy.gameObject.CompareTag("Mimico"))
+            {
+                //Destroy(enemy.gameObject);
+                Rigidbody2D enemyRigidbody = enemy.GetComponent<Rigidbody2D>();
+                enemyRigidbody.AddForce(transform.right + transform.up * 2, ForceMode2D.Impulse);
+            }
+        }
+
+        yield return new WaitForSeconds(0.4f);
+
+        isAttacking = false;
+    }
+
+    void TakeDamage(int damage)
+    {
+        healthPoints -= damage;
+        
+        if(healthPoints <= 0)
+        {
+            Die();
         }
         else
         {
-            characterAnimator.SetBool("IsRunning", false);
-        }
-        
-        if(Input.GetButtonDown("Jump") && GroundSensor.isGrounded)
-        {
-            characterRigidbody.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-            characterAnimator.SetBool("IsJumping", true);
-        }
-    }
-
-    // Update is called once per frame
-    void FixedUpdate()
-    {
-        characterRigidbody.velocity = new Vector2(horizontalInput * characterSpeed, characterRigidbody.velocity.y);
-    }
-
-    void TakeDamage()
-    {
-        healthPoints--;
-        characterAnimator.SetTrigger("IsHurt");
-
-        if(healthPoints == 0)
-        {
-            Die();
+            characterAnimator.SetTrigger("IsHurt");
         }
     }
 
     void Die()
     {
-        characterAnimator.SetBool("IsDead", true);
-        Destroy(gameObject, 0.35f);
+        characterAnimator.SetTrigger("IsDead");
+        Destroy(gameObject, 0.6f);
     }
 
     void OnCollisionEnter2D(Collision2D collision)
     {
         if(collision.gameObject.layer == 8)
         {
-            TakeDamage();
+            TakeDamage(1);
         }
+    }
+
+    void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(attackHitBox.position, attackRadius);
     }
 }
