@@ -20,6 +20,8 @@ public class BGMManager : MonoBehaviour
             instance = this;
         }
 
+        DontDestroyOnLoad(gameObject);
+
         _audioSource = GetComponent<AudioSource>();
 
         _audioSource.loop = true;

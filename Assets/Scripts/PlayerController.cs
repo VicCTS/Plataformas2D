@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerController : MonoBehaviour
@@ -10,7 +11,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float characterSpeed = 4.5f;
     [SerializeField] private float jumpForce = 10f;
 
-    [SerializeField] private int healthPoints = 5;
+    public int _maxHealth {get; private set;} = 5;
+    public int _currentHealth {get; private set;}
 
     private bool isAttacking;
 
@@ -27,6 +29,9 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         //characterRigidbody.AddForce(Vector2.up * jumpForce);
+        _currentHealth = _maxHealth;
+
+        GameManager.instance.SetHealthBar(_maxHealth);
     }
 
     void Update()
@@ -40,7 +45,8 @@ public class PlayerController : MonoBehaviour
 
         if(Input.GetButtonDown("Attack") && GroundSensor.isGrounded && !isAttacking)
         {
-            Attack();
+            //Attack();
+            StartAttack();
         }
 
         if(Input.GetKeyDown(KeyCode.P))
@@ -126,7 +132,7 @@ public class PlayerController : MonoBehaviour
         characterAnimator.SetBool("IsJumping", true);
     }
 
-    void Attack()
+    /*void Attack()
     {
         StartCoroutine(AttackAnimation());
         characterAnimator.SetTrigger("Attack");         
@@ -152,13 +158,40 @@ public class PlayerController : MonoBehaviour
         yield return new WaitForSeconds(0.4f);
 
         isAttacking = false;
+    }*/
+
+    void StartAttack()
+    {
+        isAttacking = true;
+        characterAnimator.SetTrigger("Attack");
+    }
+
+    void Attack()
+    {
+        Collider2D[] collider = Physics2D.OverlapCircleAll(attackHitBox.position, attackRadius);
+        foreach(Collider2D enemy in collider)
+        {
+            if(enemy.gameObject.CompareTag("Mimico"))
+            {
+                //Destroy(enemy.gameObject);
+                Rigidbody2D enemyRigidbody = enemy.GetComponent<Rigidbody2D>();
+                enemyRigidbody.AddForce(transform.right + transform.up * 2, ForceMode2D.Impulse);
+            }
+        }
+    }
+
+    void EndAttack()
+    {
+        isAttacking = false;
     }
 
     void TakeDamage(int damage)
     {
-        healthPoints -= damage;
+        _currentHealth -= damage;
+
+        GameManager.instance.UpdateHealthBar(_currentHealth);
         
-        if(healthPoints <= 0)
+        if(_currentHealth <= 0)
         {
             Die();
         }
@@ -166,6 +199,18 @@ public class PlayerController : MonoBehaviour
         {
             characterAnimator.SetTrigger("IsHurt");
         }
+    }
+
+    public void AddHealth(int health)
+    {
+        _currentHealth += health;
+
+        if(_currentHealth > _maxHealth)
+        {
+            _currentHealth = _maxHealth;
+        }
+
+        GameManager.instance.UpdateHealthBar(_currentHealth);
     }
 
     void Die()
